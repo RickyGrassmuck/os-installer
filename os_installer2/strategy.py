@@ -142,13 +142,16 @@ class DiskStrategy:
 
     def get_suitable_esp(self):
         """ Attempt to find the suitable ESP.... """
+        esps = []
         l = self.dp.collect_esp()
         if not l:
             return None
-        e = l[0]
-        if e.freespace < ESP_FREE_REQUIRED:
+        for e in l:
+            if e.freespace > ESP_FREE_REQUIRED:
+                esps.append(e)
+        if len(esps) == 0:
             return None
-        return e
+        return esps
 
     def dsc(self, thing):
         device = None
@@ -184,6 +187,7 @@ class DiskStrategy:
             # Create a new ESP
             return [("Create new ESP on {}".format(self.drive.path), "c")]
         cand = self.get_suitable_esp()
+        ret = []
         # Have an ESP and it's not good enough for use.
         if not cand:
             if esps:
@@ -193,7 +197,9 @@ class DiskStrategy:
             else:
                 self.set_errors("No usable ESP found on this system")
             return []
-        return [(self.dsc(cand), cand.path)]
+        for e in cand:
+            ret.append((self.dsc(e), e.path))
+        return ret
 
     def reset_operations(self):
         """ Reset the current operations """
@@ -274,15 +280,19 @@ class EmptyDiskStrategy(DiskStrategy):
         if len(esps) == 0:
             return [("Create new ESP on {}".format(self.drive.path), "c")]
         cand = self.get_suitable_esp()
-        # Are we overwriting this ESP?
-        if self.drive.disk and esps[0].partition.disk == self.drive.disk:
-            return [("Create new ESP on {}".format(self.drive.path), "c")]
+        ret = []
+        # Have an ESP and it's not good enough for use.
         if not cand:
-            self.set_errors(
-                "ESP is too small: {} free space remaining".format(
-                    cand.freespace_string))
+            if esps:
+                self.set_errors(
+                    "ESP is too small: {} free space remaining".format(
+                        esps[0].freespace_string))
+            else:
+                self.set_errors("No usable ESP found on this system")
             return []
-        return [(self.dsc(cand), cand.path)]
+        for e in cand:
+            ret.append((self.dsc(e), e.path))
+        return ret
 
     def update_operations(self, dm, info):
         """ Handle all the magicks """
